@@ -6,6 +6,7 @@ mod macros;
 mod interfaces;
 mod sdk;
 mod hooks;
+mod netvars;
 
 #[no_mangle]
 #[allow(non_snake_case)]

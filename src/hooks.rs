@@ -1,6 +1,6 @@
 use std::{mem, ffi::{c_void, c_float}, ptr, sync::Once};
 
-use crate::{interfaces::INTERFACES, sdk::CUserCmd};
+use crate::{interfaces::INTERFACES, sdk::{CUserCmd, PlayerEntity}};
 
 pub unsafe fn init() {
     // Hook create_move
@@ -29,18 +29,30 @@ pub unsafe fn init() {
     } else {
         eprintln!("Hooks not enabled");
     }
+
+    println!("");
 }
 
-unsafe extern "stdcall" fn hk_create_move(_sampletime: c_float, _cmd: *mut CUserCmd) -> bool {
-    static HOOKED: Once = Once::new();
+static HOOKED: Once = Once::new();
+unsafe extern "stdcall" fn hk_create_move(_sampletime: c_float, cmd: *mut CUserCmd) -> bool {
     HOOKED.call_once(|| {
-        println!("\n[CreateMove]\nGreetings from CreateMove...");
+        println!("[CreateMove]");
         let index = INTERFACES.engine.get_localplayer();
-        println!("Localplayer index: {index}");
-        let localplayer = INTERFACES.entlist.get_client_entity(index);
-        if !localplayer.is_null() {
-            println!("Localplayer address: {:?}", localplayer);
+        let plocal = INTERFACES.entlist.get_client_entity(index);
+        if !plocal.is_null() {
+            println!("Localplayer address: {:?}", plocal);
         }
+        let localplayer = PlayerEntity{ start: plocal };
+        println!("Health: {}", localplayer.health());
     });
+
+    let index = INTERFACES.engine.get_localplayer();
+    let plocal = INTERFACES.entlist.get_client_entity(index);
+    let localplayer = PlayerEntity{ start: plocal };
+
+    if (localplayer.flags() & 1) == 0 {
+        (*cmd).buttons &= !2;
+    }
+
     false
 }

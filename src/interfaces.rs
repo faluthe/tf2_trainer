@@ -2,20 +2,20 @@ use std::{ffi::{c_void, c_char, c_int, CString}, mem, ptr};
 
 use windows::{Win32::{Foundation::HINSTANCE, System::LibraryLoader}, s, core::PCWSTR, w};
 
-use crate::sdk::{Engine, EntityList};
+use crate::sdk::{Engine, EntityList, BaseClient};
 
 pub struct Interfaces {
-    pub client: *mut c_void,
+    pub client: BaseClient,
     pub client_mode: *mut c_void,
     pub engine: Engine,
     pub entlist: EntityList,
 }
 
 pub static mut INTERFACES: Interfaces = Interfaces {
-    client: 0 as *mut _,
+    client: BaseClient{ start: 0 as *mut _ },
     client_mode: 0 as *mut _,
-    engine: Engine{ start: 0 as * mut _ },
-    entlist: EntityList { start: 0 as * mut _ },
+    engine: Engine{ start: 0 as *mut _ },
+    entlist: EntityList { start: 0 as *mut _ },
 };
 
 type CreateInterfaceFn = extern "C" fn(name: *const c_char, rc: *mut c_int) -> *mut c_void;
@@ -63,13 +63,13 @@ pub unsafe fn init() {
     println!("[Interfaces]");
     let client_factory = get_factory(client_mod).unwrap();
     let engine_factory = get_factory(engine_mod).unwrap();
-    INTERFACES.client = get_interface(client_factory, "VClient017").unwrap();
+    INTERFACES.client.start = get_interface(client_factory, "VClient017").unwrap();
     INTERFACES.engine.start = get_interface(engine_factory, "VEngineClient014").unwrap();
     INTERFACES.entlist.start = get_interface(client_factory, "VClientEntityList003").unwrap();
 
     // Get client mode
-    // Read vtable
-    let vtable = *(INTERFACES.client as *const usize);
+    // Read vtable address?
+    let vtable = *(INTERFACES.client.start as *const usize);
     // Add pointer size * index of function
     let function_addr = vtable + mem::size_of::<usize>() * 10;
     let buf = *(function_addr as *const usize) + 5;
