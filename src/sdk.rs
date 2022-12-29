@@ -1,24 +1,20 @@
-use std::ffi::{c_void, c_int, c_char};
-use crate::{macros::vfunc, netvars};
+use std::ffi::{c_void, c_int, c_char, c_ulong, CString};
+
+use windows::core::PCWSTR;
+
+use crate::{macros::{vfunc, netvar}, interfaces::INTERFACES};
+
+// Interfaces
+pub struct Engine { pub start: *mut c_void }
+pub struct EntityList { pub start: *mut c_void }
+pub struct BaseClient { pub start: *mut c_void }
+pub struct Surface { pub start: *mut c_void }
 
 // Classes
-pub struct Engine {
-    pub start: *mut c_void
-}
+pub struct PlayerEntity { pub start: *mut c_void }
+pub struct WeaponEntity { pub start: *mut c_void }
 
-pub struct EntityList {
-    pub start: *mut c_void
-}
-
-pub struct BaseClient {
-    pub start: *mut c_void
-}
-
-pub struct PlayerEntity {
-    pub start: *mut c_void
-}
-
-// Impls
+// Interface impls
 impl Engine {
     pub fn get_localplayer(&self) -> i32 {
         let func = vfunc!(self, i32, 12);
@@ -40,23 +36,56 @@ impl BaseClient {
     }
 }
 
-impl PlayerEntity {
-    pub unsafe fn health(&self) -> i32 {
-        // netvar!(self, "DT_CSPlayer", "m_fFlags", i32)
-        static mut OFFSET: usize = 0;
-        if OFFSET == 0 {
-            OFFSET = netvars::get("DT_BasePlayer", "m_iHealth").unwrap();
-        }
+impl Surface {
+    pub fn text_create_font(&self) -> c_ulong {
+        let func = vfunc!(self, c_ulong, 66);
+        func(self.start)
+    }
+    pub fn set_font_glyph_set(&self, font: c_ulong, font_name: &str, size: c_int, weight: c_int, flags: c_int) -> bool {
+        let func = vfunc!(self, bool, 67, c_ulong, *const c_char, c_int, c_int, c_int, c_int, c_int, c_int, c_int);
+        let font_name = CString::new(font_name).unwrap();
+        func(self.start, font, font_name.as_ptr(), size, weight, 0, 0, flags, 0, 0)
+    }
+    pub fn draw_set_text_font(&self, font: c_ulong) {
+        let func = vfunc!(self, (), 17, c_ulong);
+        func(self.start, font)
+    }
+    pub fn draw_set_text_color(&self, r: c_int, g: c_int, b: c_int, a: c_int) {
+        let func = vfunc!(self, (), 19, c_int, c_int, c_int, c_int);
+        func(self.start, r, g, b, a)
+    }
+    pub fn draw_set_text_pos(&self, x: c_int, y: c_int) {
+        let func = vfunc!(self, (), 20, c_int, c_int);
+        func(self.start, x, y)
+    }
+    pub fn draw_print_text(&self, text: PCWSTR, len: c_int) {
+        let func = vfunc!(self, (), 22, PCWSTR, c_int, c_int);
+        func(self.start, text, len, 0)
+    }
+}
 
-        *(((self.start as usize) + OFFSET) as *const i32)
+// Class impls
+impl PlayerEntity {
+    pub unsafe fn _health(&self) -> i32 {
+        netvar!(self, "DT_BasePlayer", "m_iHealth", i32)
     }
     pub unsafe fn flags(&self) -> i32 {
-        static mut OFFSET: usize = 0;
-        if OFFSET == 0 {
-            OFFSET = netvars::get("DT_BasePlayer", "m_fFlags").unwrap();
+        netvar!(self, "DT_BasePlayer", "m_fFlags", i32)
+    }
+    pub unsafe fn active_weapon(&self) -> Option<WeaponEntity> {
+        let weapon = netvar!(self, "DT_BaseCombatCharacter", "m_hActiveWeapon", usize);
+        let start = INTERFACES.entlist.get_client_entity(weapon as i32 & 0xFFF);
+        if !start.is_null() {
+            Some(WeaponEntity { start })
+        } else {
+            None
         }
+    }
+}
 
-        *(((self.start as usize) + OFFSET) as *const i32)
+impl WeaponEntity {
+    pub unsafe fn can_backstab(&self) -> bool {
+        netvar!(self, "DT_TFWeaponKnife", "m_bReadyToBackstab", bool)
     }
 }
 

@@ -9,7 +9,7 @@ macro_rules! vfunc {
             func
         }
     };
-    ($self:ident, $t:ty, $index:tt, $($arg:tt),+) => {
+    ($self:ident, $t:ty, $index:tt, $($arg:ty),+) => {
         {
             use std::mem;
             let addr = unsafe {
@@ -20,7 +20,20 @@ macro_rules! vfunc {
         }
     };
 }
-
 pub(crate) use vfunc;
 
-// TODO: A macro that unloads on error
+macro_rules! netvar {
+    ($self:ident, $table:tt, $netvar:tt, $t:ty) => {
+        {
+            use crate::netvars;
+            static mut OFFSET: usize = 0;
+            if OFFSET == 0 {
+                OFFSET = netvars::get($table, $netvar).unwrap();
+                println!("{} @ {:#X}", $netvar, OFFSET);
+            }
+
+            *((($self.start as usize) + OFFSET) as *const $t)
+        }
+    };
+}
+pub(crate) use netvar;
