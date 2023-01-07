@@ -2,7 +2,7 @@ use std::{ffi::{c_void, c_char, c_int, CString}, mem, ptr};
 
 use windows::{Win32::{Foundation::HINSTANCE, System::LibraryLoader}, s, core::PCWSTR, w};
 
-use crate::sdk::{Engine, EntityList, BaseClient, Surface};
+use crate::sdk::{Engine, EntityList, BaseClient, Surface, DebugOverlay};
 
 pub struct Interfaces {
     pub client: BaseClient,
@@ -11,6 +11,7 @@ pub struct Interfaces {
     pub entlist: EntityList,
     pub engine_vgui: *mut c_void,
     pub surface: Surface,
+    pub debug_overlay: DebugOverlay,
 }
 
 pub static mut INTERFACES: Interfaces = Interfaces {
@@ -20,6 +21,7 @@ pub static mut INTERFACES: Interfaces = Interfaces {
     entlist: EntityList { start: 0 as *mut _ },
     engine_vgui: 0 as *mut _,
     surface: Surface { start: 0 as *mut _ },
+    debug_overlay: DebugOverlay { start: 0 as *mut _ },
 };
 
 pub unsafe fn init() {
@@ -27,6 +29,7 @@ pub unsafe fn init() {
     println!("[Modules]");
     // TODO: unload on error when unwrapping
     let client_mod = get_module(w!("client.dll"), "client").unwrap();
+    println!("client mod found at {:X}", client_mod.0);
     let engine_mod = get_module(w!("engine.dll"), "engine").unwrap();
     let matsurface_mod = get_module(w!("vguimatsurface.dll"), "vguimatsurface").unwrap();
     println!("");
@@ -41,6 +44,7 @@ pub unsafe fn init() {
     INTERFACES.entlist.start = get_interface(client_factory, "VClientEntityList003").unwrap();
     INTERFACES.engine_vgui = get_interface(engine_factory, "VEngineVGui002").unwrap();
     INTERFACES.surface.start = get_interface(matsurface_factory, "VGUI_Surface030").unwrap();
+    INTERFACES.debug_overlay.start = get_interface(engine_factory, "VDebugOverlay003").unwrap();
 
     // Get client_mode
     let client_vtable = *(INTERFACES.client.start as *const usize);
@@ -77,7 +81,7 @@ unsafe fn get_interface(factory: CreateInterfaceFn, version: &str) -> Option<*mu
     }
 }
 
-unsafe fn get_module(dll: PCWSTR, label: &str) -> Option<HINSTANCE> {
+pub unsafe fn get_module(dll: PCWSTR, label: &str) -> Option<HINSTANCE> {
     match LibraryLoader::GetModuleHandleW(dll) {
         Ok(c) => {
             println!("Found {label} module");

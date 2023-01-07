@@ -7,6 +7,8 @@ mod interfaces;
 mod sdk;
 mod hooks;
 mod netvars;
+mod esp;
+mod scanner;
 
 #[no_mangle]
 #[allow(non_snake_case)]

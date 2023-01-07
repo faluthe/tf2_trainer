@@ -2,7 +2,7 @@ use std::{mem, ffi::{c_void, c_float, c_ulong}, ptr, sync::Once};
 
 use windows::w;
 
-use crate::{interfaces::INTERFACES, sdk::{CUserCmd, PlayerEntity}};
+use crate::{interfaces::INTERFACES, sdk::{CUserCmd, PlayerEntity}, esp};
 
 // Originals
 static mut PAINT: *mut c_void = ptr::null_mut();
@@ -57,7 +57,7 @@ unsafe extern "stdcall" fn hk_create_move(_sampletime: c_float, cmd: *mut CUserC
     }
     
     if let Some(weapon) = localplayer.active_weapon() {
-        if weapon.can_backstab() {
+        if weapon.is_knife() && weapon.can_backstab() {
             (*cmd).buttons |= 1;
         }
     }
@@ -82,4 +82,6 @@ unsafe extern "fastcall" fn hk_paint(ecx: usize, edx: usize, mode: i32) {
     INTERFACES.surface.draw_set_text_color(255, 255, 255, 255);
     INTERFACES.surface.draw_set_text_pos(10, 10);
     INTERFACES.surface.draw_print_text(w!("Falu's TF2 Trainer"), 18);
+
+    esp::player_esp(FONT);
 }
