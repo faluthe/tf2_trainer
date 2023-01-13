@@ -1,56 +1,48 @@
-use std::{mem, ffi::{c_void, c_float, c_ulong}, ptr, sync::Once};
+use std::{ffi::{c_void, c_ulong}, mem, ptr, sync::Once};
 
 use windows::w;
 
-use crate::{interfaces::INTERFACES, sdk::{CUserCmd, PlayerEntity}, esp};
+use crate::{esp, interfaces::INTERFACES, sdk::CUserCmd, helpers};
 
-// Originals
-static mut PAINT: *mut c_void = ptr::null_mut();
+// Original functions
+static mut O_CREATEMOVE: *mut c_void = ptr::null_mut();
+static mut O_PAINT: *mut c_void = ptr::null_mut();
 
 pub unsafe fn init() {
-    // Hook create_move
-    println!("[Hooking]");
-    // Init MH
     if minhook_sys::MH_Initialize() == minhook_sys::MH_OK {
         println!("Minhook initialized");
-    } else {
-        eprintln!("Minhook error");
-    }
+    } else { eprintln!("Minhook error"); }
 
-    create_hook(INTERFACES.client_mode, 21, hk_create_move as *mut c_void);
+    O_CREATEMOVE = create_hook(INTERFACES.client_mode.start, 21, hk_create_move as *mut c_void);
     println!("Created CreateMove hook");
-    PAINT = create_hook(INTERFACES.engine_vgui, 14, hk_paint as *mut c_void);
+    O_PAINT = create_hook(INTERFACES.engine_vgui.start, 14, hk_paint as *mut c_void);
     println!("Created Paint hook");
 
     // Enable hooks
     println!("Enabling hooks...\n");
     if minhook_sys::MH_EnableHook(ptr::null_mut()) != minhook_sys::MH_OK {
         eprintln!("Hooks NOT enabled!");
-    }
+    } else { println!("Hooks enabled"); }
 }
 
 unsafe fn create_hook(iface: *mut c_void, index: usize, hk_func: *mut c_void) -> *mut c_void {
     let vtable = *(iface as *const usize);
     let func_addr = *((vtable + (mem::size_of::<usize>() * index)) as *const usize);
-    let mut original = ptr::null_mut();
     
+    let mut original = ptr::null_mut();
     minhook_sys::MH_CreateHook(func_addr as *mut c_void, hk_func, &mut original);
     
     original
 }
 
-unsafe extern "stdcall" fn hk_create_move(_sampletime: c_float, cmd: *mut CUserCmd) -> bool {
-    let index = INTERFACES.engine.get_localplayer();
-    let plocal = INTERFACES.entlist.get_client_entity(index);
-    let localplayer = PlayerEntity{ start: plocal };
+unsafe extern "stdcall" fn hk_create_move(sample_time: f32, cmd: *mut CUserCmd) -> bool {
+    let original: extern "stdcall" fn(f32, *mut CUserCmd) = mem::transmute(O_CREATEMOVE);
+    original(sample_time, cmd);
 
-    static HOOKED: Once = Once::new();
-    HOOKED.call_once(|| {
-        println!("CreateMove hooked!");
-        if !plocal.is_null() {
-            println!("Localplayer address: {:?}", plocal);
-        }
-    });
+    let localplayer = match helpers::localplayer() {
+        Some(p) => p,
+        None => return false,
+    };
 
     if (localplayer.flags() & 1) == 0 {
         (*cmd).buttons &= !2;
@@ -66,7 +58,7 @@ unsafe extern "stdcall" fn hk_create_move(_sampletime: c_float, cmd: *mut CUserC
 }
 
 unsafe extern "fastcall" fn hk_paint(ecx: usize, edx: usize, mode: i32) {
-    let original: extern "fastcall" fn(usize, usize, i32) = mem::transmute(PAINT);
+    let original: extern "fastcall" fn(usize, usize, i32) = mem::transmute(O_PAINT);
     original(ecx, edx, mode);
 
     static HOOKED: Once = Once::new();

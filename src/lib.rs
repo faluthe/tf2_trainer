@@ -1,14 +1,15 @@
 #![feature(abi_thiscall)]
-use std::{thread, ffi::c_void, time::Duration, ptr};
-use windows::{Win32::{Foundation::HINSTANCE, System::{Console, LibraryLoader}, UI::Input::KeyboardAndMouse}, w};
+use std::{ffi::c_void, ptr, thread, time::Duration};
+use windows::{w, Win32::{Foundation::HINSTANCE, System::{Console, LibraryLoader}, UI::Input::KeyboardAndMouse}};
 
-mod macros;
-mod interfaces;
-mod sdk;
-mod hooks;
-mod netvars;
 mod esp;
+mod helpers;
+mod hooks;
+mod interfaces;
+mod macros;
+mod netvars;
 mod scanner;
+mod sdk;
 
 #[no_mangle]
 #[allow(non_snake_case)]
@@ -30,7 +31,6 @@ unsafe fn init(hlibmodule: HINSTANCE) {
     Console::AllocConsole();
     Console::SetConsoleTitleW(w!("Falu's TF2 Trainer"));
 
-    interfaces::init();
     hooks::init();
 
     while (KeyboardAndMouse::GetAsyncKeyState(KeyboardAndMouse::VK_DELETE.0 as i32) & 1) == 0 {

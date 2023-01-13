@@ -1,21 +1,28 @@
 use std::{ffi::{c_void, c_int, c_char, c_ulong, CString, c_float}, ops::Add, mem};
+use windows::{core::PCWSTR, w, Win32::System::LibraryLoader};
 
-use pelite::{pe32::{PeView, PeFile, Pe}, pattern};
-use windows::{core::PCWSTR, w};
-
-use crate::{macros::{vfunc, netvar}, interfaces::{INTERFACES, get_module}, netvars, scanner};
+use crate::{macros::{vfunc, netvar}, interfaces::INTERFACES, netvars, scanner};
 
 // Interfaces
 pub struct Engine { pub start: *mut c_void }
+unsafe impl Send for Engine {}
+unsafe impl Sync for Engine {}
 pub struct EntityList { pub start: *mut c_void }
+unsafe impl Send for EntityList {}
+unsafe impl Sync for EntityList {}
 pub struct BaseClient { pub start: *mut c_void }
+unsafe impl Send for BaseClient {}
+unsafe impl Sync for BaseClient {}
 pub struct Surface { pub start: *mut c_void }
+unsafe impl Send for Surface {}
+unsafe impl Sync for Surface {}
 pub struct DebugOverlay { pub start: *mut c_void }
+unsafe impl Send for DebugOverlay {}
+unsafe impl Sync for DebugOverlay {}
 
 // Classes
 pub struct PlayerEntity { pub start: *mut c_void }
 pub struct WeaponEntity { pub start: *mut c_void }
-pub struct Collideable { pub start: *mut c_void }
 
 // Interface impls
 impl Engine {
@@ -61,7 +68,7 @@ impl Surface {
         let func = vfunc!(self.start, (), 12, c_int, c_int, c_int, c_int);
         func(self.start, x0, y0, x1, y1)
     }
-    pub fn draw_outlined_rect(&self, x0: c_int, y0: c_int, x1: c_int, y1: c_int) {
+    pub fn _draw_outlined_rect(&self, x0: c_int, y0: c_int, x1: c_int, y1: c_int) {
         let func = vfunc!(self.start, (), 14, c_int, c_int, c_int, c_int);
         func(self.start, x0, y0, x1, y1)
     }
@@ -128,10 +135,6 @@ impl PlayerEntity {
             None
         }
     }
-    pub unsafe fn get_render_bounds(&self, mins: &mut Vec3, maxs: &mut Vec3) {
-        let func = vfunc!(self.get_renderable(), (), 20, *mut Vec3, *mut Vec3);
-        func(self.get_renderable(), mins as *mut Vec3, maxs as *mut Vec3)
-    }
     pub unsafe fn get_shared(&self) -> *mut c_void {
         static mut OFFSET: usize = 0;
         if OFFSET == 0 {
@@ -143,7 +146,7 @@ impl PlayerEntity {
     pub unsafe fn in_cond(&self, cond: Conditions) -> bool {
         static mut ADDR: usize = 0;
         if ADDR == 0 {
-            let client_mod = get_module(w!("client.dll"), "client").unwrap();
+            let client_mod = LibraryLoader::GetModuleHandleW(w!("client.dll")).unwrap();
             ADDR = scanner::find_sig(client_mod, "55 8B EC 83 EC 08 56 57 8B 7D 08 8B F1 83 FF 20").unwrap() as usize;
             println!("Address of the function: {:x}", ADDR);
         }
@@ -176,6 +179,10 @@ impl PlayerEntity {
         let func = vfunc!(self.get_networkable(), bool, 8);
         func(self.get_networkable())
     }
+	    // pub unsafe fn get_render_bounds(&self, mins: &mut Vec3, maxs: &mut Vec3) {
+    //     let func = vfunc!(self.get_renderable(), (), 20, *mut Vec3, *mut Vec3);
+    //     func(self.get_renderable(), mins as *mut Vec3, maxs as *mut Vec3)
+    // }
 }
 
 impl WeaponEntity {
@@ -191,16 +198,6 @@ impl WeaponEntity {
     }
     pub unsafe fn is_knife(&self) -> bool {
         self.weapon_id() == Weapons::TF_WEAPON_KNIFE as i32
-    }
-}
-
-impl Collideable {
-    pub unsafe fn mins(&self) -> *const Vec3 {
-        // Crashing here now
-        vfunc!(self.start, *const Vec3, 1)(self.start)
-    }
-    pub unsafe fn maxs(&self) -> *const Vec3 {
-        vfunc!(self.start, *const Vec3, 2)(self.start)
     }
 }
 
